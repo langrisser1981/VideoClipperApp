@@ -35,13 +35,14 @@ struct ExportService {
         ) else {
             throw ExportError.compositionTrackCreationFailed
         }
-        let compositionAudioTrack = composition.addMutableTrack(
-            withMediaType: .audio,
-            preferredTrackID: kCMPersistentTrackID_Invalid
-        )
-
         let sourceVideoTrack = try await asset.loadTracks(withMediaType: .video).first
         let sourceAudioTrack = try await asset.loadTracks(withMediaType: .audio).first
+
+        // Only add a composition audio track when the source actually has one —
+        // an empty, unused audio track makes AVAssetExportSession fail with "Operation Stopped".
+        let compositionAudioTrack = sourceAudioTrack != nil
+            ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+            : nil
 
         var insertTime = CMTime.zero
         for range in keptRanges {
