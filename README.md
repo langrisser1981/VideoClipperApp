@@ -18,7 +18,8 @@ VideoClipperApp/
 
 - Swift + SwiftUI（播放層使用 AppKit 的 AVPlayerView）
 - AVFoundation（AVPlayer / AVMutableComposition / AVAssetExportSession）
-- 最低系統需求：macOS 13 (Ventura)+
+- 最低系統需求：macOS 26 (Tahoe)+
+- 測試：Swift Testing
 
 ## 開發狀態
 

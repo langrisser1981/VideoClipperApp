@@ -60,10 +60,10 @@
 | 開發語言 | Swift | macOS 原生開發首選 |
 | UI 框架 | SwiftUI（搭配 AppKit 橋接） | 現代化、開發速度快；影片播放層使用 AppKit 的 AVPlayerView 以取得完整控制權 |
 | 影片播放/處理 | AVFoundation（AVPlayer, AVPlayerItem, AVMutableComposition, AVAssetExportSession） | 系統原生框架，效能佳、格式相容性高 |
-| 最低系統需求 | macOS 13 (Ventura) 以上 | 兼顧 SwiftUI 較新 API 與使用者覆蓋率 |
+| 最低系統需求 | macOS 26 (Tahoe) 以上 | 採用最新 SwiftUI / Swift 6 API，不考慮舊系統相容性負擔 |
 | 專案管理 | Xcode 專案 (.xcodeproj / Swift Package) | 標準 macOS App 開發流程 |
 | 版本控制 | Git | 已於本機建立 repo |
-| 測試 | XCTest | 單元測試（時間軸邏輯、裁切區段計算）+ 基本 UI 測試 |
+| 測試 | Swift Testing（`@Test`） | 單元測試（時間軸邏輯、裁切區段計算）+ 基本 UI 測試 |
 
 ## 5. 系統架構設計
 
