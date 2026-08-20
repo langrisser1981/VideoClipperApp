@@ -20,8 +20,9 @@ final class PlayerViewModel {
     var formattedCurrentTime: String { TimeFormatter.string(from: currentTime) }
     var formattedDuration: String { TimeFormatter.string(from: duration) }
 
-    init(player: AVPlayer = AVPlayer()) {
+    init(player: AVPlayer = AVPlayer(), duration: Double = 0) {
         self.player = player
+        self.duration = duration
     }
 
     func load(url: URL) {
@@ -51,6 +52,16 @@ final class PlayerViewModel {
     func pause() {
         player.pause()
         isPlaying = false
+    }
+
+    func seek(to time: Double) {
+        let clamped = min(max(0, time), duration)
+        currentTime = clamped
+        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    func step(by delta: Double) {
+        seek(to: currentTime + delta)
     }
 
     private func addTimeObserverIfNeeded() {
