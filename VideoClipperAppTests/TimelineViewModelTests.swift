@@ -1,0 +1,105 @@
+//
+//  TimelineViewModelTests.swift
+//  VideoClipperAppTests
+//
+
+import Testing
+@testable import VideoClipperApp
+
+@MainActor
+struct TimelineViewModelTests {
+
+    @Test func markIn_setsPendingInPoint() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        #expect(timeline.pendingInPoint == 5)
+        #expect(timeline.segments.isEmpty)
+    }
+
+    @Test func markOut_afterMarkIn_createsSegment() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        timeline.markOut(at: 10)
+        #expect(timeline.segments.count == 1)
+        #expect(timeline.segments[0].startTime == 5)
+        #expect(timeline.segments[0].endTime == 10)
+        #expect(timeline.pendingInPoint == nil)
+    }
+
+    @Test func markOut_withoutPendingInPoint_doesNothing() {
+        let timeline = TimelineViewModel()
+        timeline.markOut(at: 10)
+        #expect(timeline.segments.isEmpty)
+    }
+
+    @Test func markOut_beforeInPoint_normalizesOrder() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 5)
+        #expect(timeline.segments[0].startTime == 5)
+        #expect(timeline.segments[0].endTime == 10)
+    }
+
+    @Test func markOut_overlappingExistingSegment_mergesThem() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 0)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 3)
+        timeline.markOut(at: 8)
+        #expect(timeline.segments.count == 1)
+        #expect(timeline.segments[0].startTime == 0)
+        #expect(timeline.segments[0].endTime == 8)
+    }
+
+    @Test func deleteSegment_removesMatchingSegment() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 0)
+        timeline.markOut(at: 5)
+        let id = timeline.segments[0].id
+        timeline.deleteSegment(id: id)
+        #expect(timeline.segments.isEmpty)
+    }
+
+    @Test func undo_afterAddingSegment_removesIt() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 0)
+        timeline.markOut(at: 5)
+        timeline.undo()
+        #expect(timeline.segments.isEmpty)
+    }
+
+    @Test func undo_afterDeletingSegment_restoresIt() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 0)
+        timeline.markOut(at: 5)
+        let id = timeline.segments[0].id
+        timeline.deleteSegment(id: id)
+        timeline.undo()
+        #expect(timeline.segments.count == 1)
+        #expect(timeline.segments[0].id == id)
+    }
+
+    @Test func clearAll_removesAllSegmentsAndPending() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 0)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 8)
+        timeline.clearAll()
+        #expect(timeline.segments.isEmpty)
+        #expect(timeline.pendingInPoint == nil)
+    }
+
+    @Test func segmentContaining_timeInsideCutSegment_returnsSegment() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        timeline.markOut(at: 10)
+        #expect(timeline.segment(containing: 7)?.startTime == 5)
+    }
+
+    @Test func segmentContaining_timeOutsideAnySegment_returnsNil() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        timeline.markOut(at: 10)
+        #expect(timeline.segment(containing: 12) == nil)
+    }
+}
