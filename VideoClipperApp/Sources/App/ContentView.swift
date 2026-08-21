@@ -12,6 +12,17 @@ import os
 
 private let logger = Logger(subsystem: "com.lennycheng.VideoClipperApp", category: "ContentView")
 
+/// Fixed layout heights — kept as named constants (rather than scattered literals) since the
+/// video preview and cut-segments list are pinned to constant sizes so marking segments never
+/// resizes or squeezes any other element. `windowMinHeight` must stay large enough to fit both
+/// of these plus the rest of the chrome (timeline, controls row, spacing, padding).
+private enum Layout {
+    static let playerHeight: CGFloat = 300
+    static let segmentListHeight: CGFloat = 160
+    static let windowMinWidth: CGFloat = 560
+    static let windowMinHeight: CGFloat = 620
+}
+
 struct ContentView: View {
     @State private var viewModel = PlayerViewModel()
     @State private var timeline = TimelineViewModel()
@@ -36,7 +47,7 @@ struct ContentView: View {
                 }
             }
             .frame(minWidth: 480)
-            .frame(height: 300)
+            .frame(height: Layout.playerHeight)
 
             TimelineView(
                 duration: viewModel.duration,
@@ -85,7 +96,7 @@ struct ContentView: View {
             }
         }
         .padding()
-        .frame(minWidth: 560, minHeight: 620)
+        .frame(minWidth: Layout.windowMinWidth, minHeight: Layout.windowMinHeight)
         .onAppear { installKeyEventMonitor() }
         .onDisappear { removeKeyEventMonitor() }
         .onReceive(NotificationCenter.default.publisher(for: .videoClipperOpenFile)) { _ in
@@ -145,7 +156,7 @@ struct ContentView: View {
             }
             .listStyle(.plain)
         }
-        .frame(height: 160)
+        .frame(height: Layout.segmentListHeight)
     }
 
     // MARK: - Keyboard shortcuts
@@ -201,11 +212,9 @@ struct ContentView: View {
 
         switch characters {
         case "i":
-            logger.debug("I pressed at \(viewModel.currentTime)")
             timeline.markIn(at: viewModel.currentTime)
             return true
         case "o":
-            logger.debug("O pressed at \(viewModel.currentTime), pendingInPoint=\(timeline.pendingInPoint ?? -1)")
             timeline.markOut(at: viewModel.currentTime)
             return true
         default:
@@ -218,28 +227,23 @@ struct ContentView: View {
             return true
         case 126: // up arrow — jump precisely to the previous mark boundary
             if let target = timeline.previousBoundary(before: viewModel.currentTime) {
-                logger.debug("Up arrow: jumping to previous boundary at \(target)")
                 viewModel.seek(to: target)
             }
             return true
         case 125: // down arrow — jump precisely to the next mark boundary
             if let target = timeline.nextBoundary(after: viewModel.currentTime) {
-                logger.debug("Down arrow: jumping to next boundary at \(target)")
                 viewModel.seek(to: target)
             }
             return true
         case 51, 117: // delete / forward-delete
             if timeline.pendingInPoint != nil {
-                logger.debug("Delete pressed: cancelling pending in-point")
                 timeline.cancelPendingInPoint()
                 return true
             }
             if let segment = timeline.segment(containing: viewModel.currentTime) {
-                logger.debug("Delete pressed: removing segment at playhead")
                 timeline.deleteSegment(id: segment.id)
                 return true
             }
-            logger.debug("Delete pressed: no pending in-point or segment under playhead")
             return false
         default:
             return false
@@ -274,12 +278,12 @@ struct ContentView: View {
         }
 
         let current = viewModel.currentTime
-        let rawTarget = isLeft ? current - magnitude : current + magnitude
+        let delta = isLeft ? -magnitude : magnitude
 
-        if let snapTarget = timeline.nearestBoundary(from: current, towards: rawTarget) {
+        if let snapTarget = timeline.nearestBoundary(from: current, towards: current + delta) {
             viewModel.seek(to: snapTarget)
         } else {
-            viewModel.seek(to: rawTarget)
+            viewModel.step(by: delta)
         }
         return true
     }
@@ -315,41 +319,27 @@ struct ContentView: View {
     }
 
     private func exportVideo() {
-        logger.debug("exportVideo() called — isExporting=\(isExporting), sourceURL=\(sourceURL?.path ?? "nil"), segments=\(timeline.segments.count)")
-
         guard !isExporting else {
-            logger.debug("exportVideo() bailing: already exporting")
             exportResultMessage = "Export already in progress…"
             return
         }
         guard let sourceURL else {
-            logger.debug("exportVideo() bailing: no sourceURL")
             exportResultMessage = "Choose or load a video first."
             return
         }
         guard !timeline.segments.isEmpty else {
-            logger.debug("exportVideo() bailing: no segments marked")
             exportResultMessage = "No cut segments marked yet — mark one with I / O first."
             return
         }
 
         let segments = timeline.segments
-        for segment in segments {
-            logger.debug("Segment to cut: \(segment.startTime) – \(segment.endTime)")
-        }
-        do {
-            try marksPersistenceService.saveSegments(segments, for: sourceURL)
-            logger.debug("Saved marks sidecar for \(sourceURL.lastPathComponent)")
-        } catch {
-            logger.error("Failed to save marks sidecar: \(error.localizedDescription)")
-        }
+        try? marksPersistenceService.saveSegments(segments, for: sourceURL)
 
         // Picking the source via NSOpenPanel only grants access to that exact file, not to
         // writing new files in its folder — that fails with a permission error on TCC-protected
         // locations (Desktop/Documents/Downloads). NSSavePanel grants write access to wherever
         // the user confirms, regardless of folder, so use it instead of writing next to the source.
-        guard let outputURL = presentSavePanel(suggestedURL: ExportFilenameFormatter.outputURL(for: sourceURL)) else {
-            logger.debug("exportVideo() cancelled: no output location chosen")
+        guard let outputURL = importService.presentSavePanel(suggestedURL: ExportFilenameFormatter.outputURL(for: sourceURL)) else {
             return
         }
 
@@ -368,14 +358,6 @@ struct ContentView: View {
             }
             isExporting = false
         }
-    }
-
-    private func presentSavePanel(suggestedURL: URL) -> URL? {
-        let panel = NSSavePanel()
-        panel.directoryURL = suggestedURL.deletingLastPathComponent()
-        panel.nameFieldStringValue = suggestedURL.lastPathComponent
-        panel.allowedContentTypes = [.mpeg4Movie]
-        return panel.runModal() == .OK ? panel.url : nil
     }
 }
 

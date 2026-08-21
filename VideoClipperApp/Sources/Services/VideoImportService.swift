@@ -57,4 +57,17 @@ struct VideoImportService {
         panel.canChooseFiles = true
         return panel.runModal() == .OK ? panel.url : nil
     }
+
+    /// Prompts the user to confirm an output location, pre-filled with `suggestedURL`. Unlike
+    /// writing next to a file picked via `presentOpenPanel()`, the location the user confirms
+    /// here is granted write access regardless of folder — needed to export into TCC-protected
+    /// locations like Desktop/Documents/Downloads.
+    @MainActor
+    func presentSavePanel(suggestedURL: URL) -> URL? {
+        let panel = NSSavePanel()
+        panel.directoryURL = suggestedURL.deletingLastPathComponent()
+        panel.nameFieldStringValue = suggestedURL.lastPathComponent
+        panel.allowedContentTypes = [.mpeg4Movie]
+        return panel.runModal() == .OK ? panel.url : nil
+    }
 }
