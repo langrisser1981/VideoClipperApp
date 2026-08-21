@@ -91,6 +91,12 @@ struct ContentView: View {
         .focused($isKeyboardAreaFocused)
         .onAppear { isKeyboardAreaFocused = true }
         .onKeyPress { handleKeyPress($0) }
+        .onReceive(NotificationCenter.default.publisher(for: .videoClipperOpenFile)) { _ in
+            chooseFile()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .videoClipperExportVideo)) { _ in
+            exportVideo()
+        }
         .onChange(of: viewModel.currentTime) { _, newTime in
             autoSkipCutSegment(at: newTime)
         }
@@ -135,12 +141,6 @@ struct ContentView: View {
             switch press.characters {
             case "z":
                 timeline.undo()
-                return .handled
-            case "o":
-                chooseFile()
-                return .handled
-            case "e":
-                exportVideo()
                 return .handled
             default:
                 return .ignored
