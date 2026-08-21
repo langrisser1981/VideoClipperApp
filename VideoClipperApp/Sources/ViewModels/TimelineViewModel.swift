@@ -18,9 +18,12 @@ final class TimelineViewModel {
         pendingInPoint = time
     }
 
+    /// Completes the pending in-point with an out-point at `time`. Does nothing (and keeps the
+    /// pending in-point active) if there is no pending in-point, or if `time` is the same as it —
+    /// the in- and out-points must be at different positions to form a segment.
     @discardableResult
     func markOut(at time: Double) -> UUID? {
-        guard let inPoint = pendingInPoint else { return nil }
+        guard let inPoint = pendingInPoint, inPoint != time else { return nil }
         pendingInPoint = nil
         pushUndoSnapshot()
         let newSegment = ClipSegment(startTime: inPoint, endTime: time)

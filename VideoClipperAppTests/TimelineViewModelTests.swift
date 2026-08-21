@@ -32,6 +32,22 @@ struct TimelineViewModelTests {
         #expect(timeline.segments.isEmpty)
     }
 
+    @Test func markIn_calledAgainWithPendingInPoint_replacesIt() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        timeline.markIn(at: 8)
+        #expect(timeline.pendingInPoint == 8)
+    }
+
+    @Test func markOut_atSamePositionAsInPoint_doesNothingAndKeepsPending() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        let result = timeline.markOut(at: 5)
+        #expect(result == nil)
+        #expect(timeline.segments.isEmpty)
+        #expect(timeline.pendingInPoint == 5)
+    }
+
     @Test func markOut_beforeInPoint_normalizesOrder() {
         let timeline = TimelineViewModel()
         timeline.markIn(at: 10)
