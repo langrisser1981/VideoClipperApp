@@ -136,6 +136,9 @@ struct ContentView: View {
             case "z":
                 timeline.undo()
                 return .handled
+            case "o":
+                chooseFile()
+                return .handled
             case "e":
                 exportVideo()
                 return .handled

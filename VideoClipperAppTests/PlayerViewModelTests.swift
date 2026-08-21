@@ -87,4 +87,18 @@ struct PlayerViewModelTests {
         viewModel.step(by: 5)
         #expect(viewModel.currentTime == 10)
     }
+
+    @Test func step_fromFractionalCurrentTime_roundsUpToNearestSecondFirst() {
+        let viewModel = PlayerViewModel(duration: 100)
+        viewModel.seek(to: 10.6)
+        viewModel.step(by: 1)
+        #expect(viewModel.currentTime == 12)
+    }
+
+    @Test func step_fromFractionalCurrentTime_roundsDownToNearestSecondFirst() {
+        let viewModel = PlayerViewModel(duration: 100)
+        viewModel.seek(to: 10.2)
+        viewModel.step(by: -1)
+        #expect(viewModel.currentTime == 9)
+    }
 }

@@ -60,8 +60,10 @@ final class PlayerViewModel {
         player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
+    /// Steps by a whole-second delta. Rounds the current time to the nearest second first,
+    /// so stepping after playback (which leaves a fractional currentTime) still lands on a whole second.
     func step(by delta: Double) {
-        seek(to: currentTime + delta)
+        seek(to: currentTime.rounded() + delta)
     }
 
     private func addTimeObserverIfNeeded() {
