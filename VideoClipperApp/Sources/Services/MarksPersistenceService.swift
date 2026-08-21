@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import CryptoKit
 
 private struct StoredClipSegment: Codable {
     let startTime: Double
@@ -19,9 +20,8 @@ private struct StoredClipSegment: Codable {
 /// locations like Desktop/Documents/Downloads. Application Support is always writable.
 struct MarksPersistenceService {
     func marksFileURL(for videoURL: URL, fileManager: FileManager = .default) -> URL {
-        let marksDirectory = marksDirectory(fileManager: fileManager)
-        try? fileManager.createDirectory(at: marksDirectory, withIntermediateDirectories: true)
-        return marksDirectory.appendingPathComponent("\(key(for: videoURL)).clipmarks.json")
+        marksDirectory(fileManager: fileManager)
+            .appendingPathComponent("\(key(for: videoURL)).clipmarks.json")
     }
 
     func loadSegments(for videoURL: URL, fileManager: FileManager = .default) -> [ClipSegment]? {
@@ -36,6 +36,7 @@ struct MarksPersistenceService {
 
     func saveSegments(_ segments: [ClipSegment], for videoURL: URL, fileManager: FileManager = .default) throws {
         let url = marksFileURL(for: videoURL, fileManager: fileManager)
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let stored = segments.map { StoredClipSegment(startTime: $0.startTime, endTime: $0.endTime) }
         let data = try JSONEncoder().encode(stored)
         try data.write(to: url, options: .atomic)
@@ -56,9 +57,10 @@ struct MarksPersistenceService {
         return appSupport.appendingPathComponent("VideoClipperApp/Marks", isDirectory: true)
     }
 
-    /// A stable, filesystem-safe identifier derived from the video's absolute path.
+    /// A stable, collision-resistant, filesystem-safe identifier derived from the video's absolute path.
     private func key(for videoURL: URL) -> String {
-        videoURL.standardizedFileURL.path
-            .replacingOccurrences(of: "/", with: "_")
+        let path = videoURL.standardizedFileURL.path
+        let digest = SHA256.hash(data: Data(path.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
