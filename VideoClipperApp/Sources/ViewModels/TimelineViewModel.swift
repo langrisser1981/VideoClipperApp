@@ -9,10 +9,15 @@ import Observation
 @Observable
 @MainActor
 final class TimelineViewModel {
-    private(set) var segments: [ClipSegment] = []
-    private(set) var pendingInPoint: Double?
+    private(set) var segments: [ClipSegment] = [] {
+        didSet { cachedBoundaryTimes = nil }
+    }
+    private(set) var pendingInPoint: Double? {
+        didSet { cachedBoundaryTimes = nil }
+    }
 
     private var undoStack: [[ClipSegment]] = []
+    private var cachedBoundaryTimes: [Double]?
 
     func markIn(at time: Double) {
         pendingInPoint = time
@@ -67,12 +72,16 @@ final class TimelineViewModel {
     /// All marked boundary times (segment start/end points, plus a pending in-point if any),
     /// sorted ascending. Used to jump the playhead precisely onto an existing mark, since arrow-key
     /// stepping is intentionally unrounded and can drift away from whole-second mark positions.
+    /// Cached until the next mutation, since arrow-key holds call this on every OS key-repeat tick.
     func boundaryTimes() -> [Double] {
+        if let cachedBoundaryTimes { return cachedBoundaryTimes }
         var times = segments.flatMap { [$0.startTime, $0.endTime] }
         if let pendingInPoint {
             times.append(pendingInPoint)
         }
-        return times.sorted()
+        times.sort()
+        cachedBoundaryTimes = times
+        return times
     }
 
     func previousBoundary(before time: Double) -> Double? {
@@ -88,9 +97,11 @@ final class TimelineViewModel {
     /// which feels less abrupt than jumping straight to the raw stepped time.
     func nearestBoundary(from time: Double, towards target: Double) -> Double? {
         if target > time {
-            return boundaryTimes().first { $0 > time && $0 <= target }
+            guard let next = nextBoundary(after: time), next <= target else { return nil }
+            return next
         } else if target < time {
-            return boundaryTimes().last { $0 < time && $0 >= target }
+            guard let previous = previousBoundary(before: time), previous >= target else { return nil }
+            return previous
         }
         return nil
     }
