@@ -148,6 +148,84 @@ struct TimelineViewModelTests {
         #expect(timeline.pendingInPoint == nil)
     }
 
+    @Test func boundaryTimes_includesAllSegmentEdgesSortedAscending() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        #expect(timeline.boundaryTimes() == [2, 5, 10, 15])
+    }
+
+    @Test func boundaryTimes_includesPendingInPoint() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        timeline.markIn(at: 20)
+        #expect(timeline.boundaryTimes() == [10, 15, 20])
+    }
+
+    @Test func previousBoundary_returnsClosestEarlierBoundary() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        #expect(timeline.previousBoundary(before: 7.123) == 5)
+        #expect(timeline.previousBoundary(before: 2) == nil)
+    }
+
+    @Test func nextBoundary_returnsClosestLaterBoundary() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        #expect(timeline.nextBoundary(after: 7.123) == 10)
+        #expect(timeline.nextBoundary(after: 15) == nil)
+    }
+
+    @Test func nearestBoundary_movingForward_returnsClosestBoundaryWithinRange() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        #expect(timeline.nearestBoundary(from: 3, towards: 12) == 5)
+    }
+
+    @Test func nearestBoundary_movingBackward_returnsClosestBoundaryWithinRange() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        #expect(timeline.nearestBoundary(from: 12, towards: 3) == 10)
+    }
+
+    @Test func nearestBoundary_noBoundaryWithinRange_returnsNil() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        #expect(timeline.nearestBoundary(from: 6, towards: 8) == nil)
+    }
+
+    @Test func nearestBoundary_targetLandsExactlyOnBoundary_returnsThatBoundary() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        #expect(timeline.nearestBoundary(from: 4, towards: 5) == 5)
+    }
+
+    @Test func nearestBoundary_startingExactlyOnBoundary_findsNextOneNotItself() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 2)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 10)
+        timeline.markOut(at: 15)
+        #expect(timeline.nearestBoundary(from: 5, towards: 12) == 10)
+    }
+
     @Test func cancelPendingInPoint_clearsPendingWithoutCreatingSegment() {
         let timeline = TimelineViewModel()
         timeline.markIn(at: 5)

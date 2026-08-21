@@ -64,6 +64,37 @@ final class TimelineViewModel {
         segments.first { $0.contains(time) }
     }
 
+    /// All marked boundary times (segment start/end points, plus a pending in-point if any),
+    /// sorted ascending. Used to jump the playhead precisely onto an existing mark, since arrow-key
+    /// stepping is intentionally unrounded and can drift away from whole-second mark positions.
+    func boundaryTimes() -> [Double] {
+        var times = segments.flatMap { [$0.startTime, $0.endTime] }
+        if let pendingInPoint {
+            times.append(pendingInPoint)
+        }
+        return times.sorted()
+    }
+
+    func previousBoundary(before time: Double) -> Double? {
+        boundaryTimes().last { $0 < time }
+    }
+
+    func nextBoundary(after time: Double) -> Double? {
+        boundaryTimes().first { $0 > time }
+    }
+
+    /// The closest boundary strictly between `time` and `target` (inclusive of `target`), in the
+    /// direction of travel. Used so arrow-key stepping stops at a mark instead of stepping past it,
+    /// which feels less abrupt than jumping straight to the raw stepped time.
+    func nearestBoundary(from time: Double, towards target: Double) -> Double? {
+        if target > time {
+            return boundaryTimes().first { $0 > time && $0 <= target }
+        } else if target < time {
+            return boundaryTimes().last { $0 < time && $0 >= target }
+        }
+        return nil
+    }
+
     private func pushUndoSnapshot() {
         undoStack.append(segments)
     }
