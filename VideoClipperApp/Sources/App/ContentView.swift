@@ -28,6 +28,7 @@ struct ContentView: View {
 
     private let importService = VideoImportService()
     private let exportService = ExportService()
+    private let marksPersistenceService = MarksPersistenceService()
 
     var body: some View {
         VStack(spacing: 12) {
@@ -106,6 +107,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .videoClipperExportVideo)) { _ in
             exportVideo()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .videoClipperResetAllMarks)) { _ in
+            resetAllMarks()
         }
         .onChange(of: viewModel.currentTime) { _, newTime in
             autoSkipCutSegment(at: newTime)
@@ -250,8 +254,19 @@ struct ContentView: View {
 
     private func loadVideo(at url: URL) {
         sourceURL = url
-        timeline.clearAll()
+        if let restoredSegments = marksPersistenceService.loadSegments(for: url) {
+            timeline.replaceAllSegments(with: restoredSegments)
+        } else {
+            timeline.clearAll()
+        }
         viewModel.load(url: url)
+    }
+
+    private func resetAllMarks() {
+        timeline.clearAll()
+        if let sourceURL {
+            marksPersistenceService.deleteMarksFile(for: sourceURL)
+        }
     }
 
     private func exportVideo() {
@@ -261,9 +276,11 @@ struct ContentView: View {
             .appendingPathExtension("clipped")
             .appendingPathExtension("mp4")
 
+        let segments = timeline.segments
+        try? marksPersistenceService.saveSegments(segments, for: sourceURL)
+
         isExporting = true
         exportResultMessage = "Exporting…"
-        let segments = timeline.segments
 
         Task {
             do {

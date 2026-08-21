@@ -10,6 +10,7 @@ import SwiftUI
 extension Notification.Name {
     static let videoClipperOpenFile = Notification.Name("videoClipperOpenFile")
     static let videoClipperExportVideo = Notification.Name("videoClipperExportVideo")
+    static let videoClipperResetAllMarks = Notification.Name("videoClipperResetAllMarks")
 }
 
 @main
@@ -29,6 +30,12 @@ struct VideoClipperAppApp: App {
                     NotificationCenter.default.post(name: .videoClipperExportVideo, object: nil)
                 }
                 .keyboardShortcut("e", modifiers: .command)
+
+                Divider()
+
+                Button("Reset All Marks") {
+                    NotificationCenter.default.post(name: .videoClipperResetAllMarks, object: nil)
+                }
             }
         }
     }

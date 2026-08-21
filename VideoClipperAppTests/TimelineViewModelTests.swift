@@ -136,6 +136,18 @@ struct TimelineViewModelTests {
         #expect(secondId == timeline.segments[0].id)
     }
 
+    @Test func replaceAllSegments_setsSegmentsSortedAndClearsPending() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 50)
+        let restored = [
+            ClipSegment(startTime: 20, endTime: 30),
+            ClipSegment(startTime: 0, endTime: 5),
+        ]
+        timeline.replaceAllSegments(with: restored)
+        #expect(timeline.segments.map(\.startTime) == [0, 20])
+        #expect(timeline.pendingInPoint == nil)
+    }
+
     @Test func cancelPendingInPoint_clearsPendingWithoutCreatingSegment() {
         let timeline = TimelineViewModel()
         timeline.markIn(at: 5)

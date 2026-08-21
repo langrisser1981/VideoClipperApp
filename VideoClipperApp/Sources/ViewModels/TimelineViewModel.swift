@@ -53,6 +53,13 @@ final class TimelineViewModel {
         pendingInPoint = nil
     }
 
+    /// Replaces all segments wholesale — used to restore previously-persisted marks for a video.
+    func replaceAllSegments(with newSegments: [ClipSegment]) {
+        pushUndoSnapshot()
+        segments = newSegments.sorted { $0.startTime < $1.startTime }
+        pendingInPoint = nil
+    }
+
     func segment(containing time: Double) -> ClipSegment? {
         segments.first { $0.contains(time) }
     }
