@@ -9,10 +9,29 @@ import Foundation
 
 struct MarksPersistenceServiceTests {
 
-    @Test func marksFileURL_derivesFromVideoURL() {
+    @Test func marksFileURL_endsWithClipmarksExtension() {
         let service = MarksPersistenceService()
         let videoURL = URL(fileURLWithPath: "/tmp/movie.mp4")
-        #expect(service.marksFileURL(for: videoURL).lastPathComponent == "movie.clipmarks.json")
+        #expect(service.marksFileURL(for: videoURL).lastPathComponent.hasSuffix(".clipmarks.json"))
+    }
+
+    @Test func marksFileURL_isStableAcrossCalls() {
+        let service = MarksPersistenceService()
+        let videoURL = URL(fileURLWithPath: "/tmp/movie.mp4")
+        #expect(service.marksFileURL(for: videoURL) == service.marksFileURL(for: videoURL))
+    }
+
+    @Test func marksFileURL_differsForDifferentVideos() {
+        let service = MarksPersistenceService()
+        let a = URL(fileURLWithPath: "/tmp/movie-a.mp4")
+        let b = URL(fileURLWithPath: "/tmp/movie-b.mp4")
+        #expect(service.marksFileURL(for: a) != service.marksFileURL(for: b))
+    }
+
+    @Test func marksFileURL_doesNotLiveNextToSourceVideo() {
+        let service = MarksPersistenceService()
+        let videoURL = URL(fileURLWithPath: "/tmp/movie.mp4")
+        #expect(service.marksFileURL(for: videoURL).deletingLastPathComponent().path != "/tmp")
     }
 
     @Test func loadSegments_whenNoFileExists_returnsNil() {
