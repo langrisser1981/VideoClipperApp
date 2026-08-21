@@ -19,13 +19,7 @@ struct ContentView: View {
     @State private var exportResultMessage: String?
     @State private var arrowHoldStreak: Int = 0
     @State private var activeArrowIsLeft: Bool?
-    @State private var tabFocusedControl: FocusableControl?
     @State private var keyEventMonitor: Any?
-
-    private enum FocusableControl: Hashable {
-        case chooseFile
-        case export
-    }
 
     private let importService = VideoImportService()
     private let exportService = ExportService()
@@ -67,13 +61,11 @@ struct ContentView: View {
                 Button("Choose File…") {
                     chooseFile()
                 }
-                .overlay(tabFocusRing(for: .chooseFile))
 
                 Button("Export…") {
                     exportVideo()
                 }
                 .disabled(isExporting)
-                .overlay(tabFocusRing(for: .export))
             }
 
             HStack {
@@ -111,15 +103,6 @@ struct ContentView: View {
         }
         .onChange(of: viewModel.currentTime) { _, newTime in
             autoSkipCutSegment(at: newTime)
-        }
-    }
-
-    @ViewBuilder
-    private func tabFocusRing(for control: FocusableControl) -> some View {
-        if tabFocusedControl == control {
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.accentColor, lineWidth: 2)
-                .padding(-3)
         }
     }
 
@@ -223,20 +206,6 @@ struct ContentView: View {
         case 49: // space
             viewModel.togglePlayPause()
             return true
-        case 48: // tab
-            tabFocusedControl = (tabFocusedControl == .chooseFile) ? .export : .chooseFile
-            return true
-        case 36: // return
-            switch tabFocusedControl {
-            case .chooseFile:
-                chooseFile()
-                return true
-            case .export:
-                exportVideo()
-                return true
-            case nil:
-                return false
-            }
         case 51, 117: // delete / forward-delete
             if timeline.pendingInPoint != nil {
                 timeline.cancelPendingInPoint()
@@ -323,7 +292,10 @@ struct ContentView: View {
     }
 
     private func exportVideo() {
-        guard !isExporting else { return }
+        guard !isExporting else {
+            exportResultMessage = "Export already in progress…"
+            return
+        }
         guard let sourceURL else {
             exportResultMessage = "Choose or load a video first."
             return
