@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import AppKit
 
 struct ContentView: View {
     @State private var viewModel = PlayerViewModel()
@@ -18,8 +19,8 @@ struct ContentView: View {
     @State private var exportResultMessage: String?
     @State private var arrowHoldStreak: Int = 0
     @State private var activeArrowIsLeft: Bool?
-    @FocusState private var isKeyboardAreaFocused: Bool
-    @FocusState private var focusedControl: FocusableControl?
+    @State private var tabFocusedControl: FocusableControl?
+    @State private var keyEventMonitor: Any?
 
     private enum FocusableControl: Hashable {
         case chooseFile
@@ -66,13 +67,13 @@ struct ContentView: View {
                 Button("Choose File…") {
                     chooseFile()
                 }
-                .focused($focusedControl, equals: .chooseFile)
+                .overlay(tabFocusRing(for: .chooseFile))
 
                 Button("Export…") {
                     exportVideo()
                 }
-                .disabled(sourceURL == nil || timeline.segments.isEmpty || isExporting)
-                .focused($focusedControl, equals: .export)
+                .disabled(isExporting)
+                .overlay(tabFocusRing(for: .export))
             }
 
             HStack {
@@ -97,11 +98,8 @@ struct ContentView: View {
         }
         .padding()
         .frame(minWidth: 560, minHeight: 460)
-        .focusable()
-        .focusEffectDisabled()
-        .focused($isKeyboardAreaFocused)
-        .onAppear { isKeyboardAreaFocused = true }
-        .onKeyPress(phases: [.down, .repeat, .up]) { handleKeyPress($0) }
+        .onAppear { installKeyEventMonitor() }
+        .onDisappear { removeKeyEventMonitor() }
         .onReceive(NotificationCenter.default.publisher(for: .videoClipperOpenFile)) { _ in
             chooseFile()
         }
@@ -113,6 +111,15 @@ struct ContentView: View {
         }
         .onChange(of: viewModel.currentTime) { _, newTime in
             autoSkipCutSegment(at: newTime)
+        }
+    }
+
+    @ViewBuilder
+    private func tabFocusRing(for control: FocusableControl) -> some View {
+        if tabFocusedControl == control {
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.accentColor, lineWidth: 2)
+                .padding(-3)
         }
     }
 
@@ -150,71 +157,115 @@ struct ContentView: View {
         }
     }
 
-    private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
-        switch press.key {
-        case .leftArrow:
-            return handleArrowKey(isLeft: true, phase: press.phase, isShift: press.modifiers.contains(.shift))
-        case .rightArrow:
-            return handleArrowKey(isLeft: false, phase: press.phase, isShift: press.modifiers.contains(.shift))
+    // MARK: - Keyboard shortcuts
+
+    // Uses an NSEvent local monitor instead of SwiftUI's onKeyPress/@FocusState: onKeyPress only
+    // fires while the exact modified view holds SwiftUI's focus, which real-world testing showed
+    // gets stolen by any button click, silently disabling every shortcut. A window-level NSEvent
+    // monitor intercepts key events regardless of which SwiftUI view currently "has focus".
+    private func installKeyEventMonitor() {
+        guard keyEventMonitor == nil else { return }
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { event in
+            // Let an actively-focused text field type normally instead of triggering shortcuts.
+            if event.window?.firstResponder is NSTextView {
+                return event
+            }
+            return handleKeyEvent(event) ? nil : event
+        }
+    }
+
+    private func removeKeyEventMonitor() {
+        if let keyEventMonitor {
+            NSEvent.removeMonitor(keyEventMonitor)
+        }
+        keyEventMonitor = nil
+    }
+
+    /// Returns true if the event was consumed (should not propagate further).
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        let isDown = event.type == .keyDown
+
+        switch event.keyCode {
+        case 123: // left arrow
+            return handleArrowKey(isLeft: true, isDown: isDown, isShift: event.modifierFlags.contains(.shift))
+        case 124: // right arrow
+            return handleArrowKey(isLeft: false, isDown: isDown, isShift: event.modifierFlags.contains(.shift))
         default:
             break
         }
 
         // Everything below only reacts to the initial key-down, not held-key repeats or key-up.
-        guard press.phase == .down else { return .ignored }
+        guard isDown, !event.isARepeat else { return false }
 
-        if press.modifiers.contains(.command) {
-            switch press.characters {
-            case "z":
+        let modifiers = event.modifierFlags
+        let characters = event.charactersIgnoringModifiers?.lowercased()
+
+        if modifiers.contains(.command) {
+            if characters == "z" {
                 timeline.undo()
-                return .handled
-            default:
-                return .ignored
+                return true
             }
+            return false
         }
 
-        switch press.key {
-        case .space:
-            viewModel.togglePlayPause()
-            return .handled
-        case KeyEquivalent("i"):
+        switch characters {
+        case "i":
             timeline.markIn(at: viewModel.currentTime)
-            return .handled
-        case KeyEquivalent("o"):
+            return true
+        case "o":
             timeline.markOut(at: viewModel.currentTime)
-            return .handled
-        case .tab:
-            focusedControl = (focusedControl == .chooseFile) ? .export : .chooseFile
-            return .handled
-        case .delete, .deleteForward:
+            return true
+        default:
+            break
+        }
+
+        switch event.keyCode {
+        case 49: // space
+            viewModel.togglePlayPause()
+            return true
+        case 48: // tab
+            tabFocusedControl = (tabFocusedControl == .chooseFile) ? .export : .chooseFile
+            return true
+        case 36: // return
+            switch tabFocusedControl {
+            case .chooseFile:
+                chooseFile()
+                return true
+            case .export:
+                exportVideo()
+                return true
+            case nil:
+                return false
+            }
+        case 51, 117: // delete / forward-delete
             if timeline.pendingInPoint != nil {
                 timeline.cancelPendingInPoint()
-                return .handled
+                return true
             }
             if let segment = timeline.segment(containing: viewModel.currentTime) {
                 timeline.deleteSegment(id: segment.id)
-                return .handled
+                return true
             }
-            return .ignored
+            return false
         default:
-            return .ignored
+            return false
         }
     }
 
-    /// Non-shift stepping accelerates the longer the arrow key is held (tracked via repeat events),
-    /// ramping from 1s up to the 10s shift-jump size. Shift always jumps a fixed 10s.
-    private func handleArrowKey(isLeft: Bool, phase: KeyPress.Phases, isShift: Bool) -> KeyPress.Result {
-        if phase == .up {
+    /// Non-shift stepping accelerates the longer the arrow key is held, ramping from 1s up to
+    /// the 10s shift-jump size. Shift always jumps a fixed 10s.
+    private func handleArrowKey(isLeft: Bool, isDown: Bool, isShift: Bool) -> Bool {
+        guard isDown else {
             if activeArrowIsLeft == isLeft {
                 activeArrowIsLeft = nil
                 arrowHoldStreak = 0
             }
-            return .handled
+            return true
         }
 
         if isShift {
             viewModel.step(by: isLeft ? -10 : 10)
-            return .handled
+            return true
         }
 
         if activeArrowIsLeft == isLeft {
@@ -226,8 +277,10 @@ struct ContentView: View {
 
         let magnitude = min(1 + Double(arrowHoldStreak) * 0.5, 10)
         viewModel.step(by: isLeft ? -magnitude : magnitude)
-        return .handled
+        return true
     }
+
+    // MARK: - Actions
 
     private func autoSkipCutSegment(at time: Double) {
         guard viewModel.isPlaying, let segment = timeline.segment(containing: time) else { return }
@@ -270,12 +323,17 @@ struct ContentView: View {
     }
 
     private func exportVideo() {
-        guard let sourceURL, !timeline.segments.isEmpty, !isExporting else { return }
-        let outputURL = sourceURL
-            .deletingPathExtension()
-            .appendingPathExtension("clipped")
-            .appendingPathExtension("mp4")
+        guard !isExporting else { return }
+        guard let sourceURL else {
+            exportResultMessage = "Choose or load a video first."
+            return
+        }
+        guard !timeline.segments.isEmpty else {
+            exportResultMessage = "No cut segments marked yet — mark one with I / O first."
+            return
+        }
 
+        let outputURL = ExportFilenameFormatter.outputURL(for: sourceURL)
         let segments = timeline.segments
         try? marksPersistenceService.saveSegments(segments, for: sourceURL)
 
