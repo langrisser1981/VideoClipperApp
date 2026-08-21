@@ -13,7 +13,6 @@ struct ContentView: View {
     @State private var timeline = TimelineViewModel()
     @State private var pastedPath: String = ""
     @State private var errorMessage: String?
-    @State private var selectedSegmentID: UUID?
     @State private var sourceURL: URL?
     @State private var isExporting = false
     @State private var exportResultMessage: String?
@@ -35,7 +34,6 @@ struct ContentView: View {
                 duration: viewModel.duration,
                 currentTime: viewModel.currentTime,
                 segments: timeline.segments,
-                selectedSegmentID: selectedSegmentID,
                 pendingInPoint: timeline.pendingInPoint,
                 onSeek: { viewModel.seek(to: $0) }
             )
@@ -115,18 +113,16 @@ struct ContentView: View {
                 Text("Cut segments")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                List(timeline.segments, selection: $selectedSegmentID) { segment in
+                List(timeline.segments) { segment in
                     HStack {
                         Text("\(TimeFormatter.string(from: segment.startTime)) – \(TimeFormatter.string(from: segment.endTime))")
                             .font(.caption)
                         Spacer()
                         Button("Delete") {
                             timeline.deleteSegment(id: segment.id)
-                            if selectedSegmentID == segment.id { selectedSegmentID = nil }
                         }
                         .font(.caption)
                     }
-                    .tag(segment.id)
                 }
                 .listStyle(.plain)
                 .frame(maxHeight: 140)
@@ -156,9 +152,7 @@ struct ContentView: View {
             timeline.markIn(at: viewModel.currentTime)
             return .handled
         case KeyEquivalent("o"):
-            if let newID = timeline.markOut(at: viewModel.currentTime) {
-                selectedSegmentID = newID
-            }
+            timeline.markOut(at: viewModel.currentTime)
             return .handled
         case .leftArrow:
             viewModel.step(by: press.modifiers.contains(.shift) ? -5 : -1)
@@ -171,9 +165,8 @@ struct ContentView: View {
                 timeline.cancelPendingInPoint()
                 return .handled
             }
-            if let id = selectedSegmentID {
-                timeline.deleteSegment(id: id)
-                selectedSegmentID = nil
+            if let segment = timeline.segment(containing: viewModel.currentTime) {
+                timeline.deleteSegment(id: segment.id)
                 return .handled
             }
             return .ignored
@@ -208,7 +201,6 @@ struct ContentView: View {
     private func loadVideo(at url: URL) {
         sourceURL = url
         timeline.clearAll()
-        selectedSegmentID = nil
         viewModel.load(url: url)
     }
 
