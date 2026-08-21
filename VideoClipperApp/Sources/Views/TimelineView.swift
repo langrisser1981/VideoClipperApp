@@ -10,6 +10,8 @@ struct TimelineView: View {
     let duration: Double
     let currentTime: Double
     let segments: [ClipSegment]
+    let selectedSegmentID: UUID?
+    let pendingInPoint: Double?
     var onSeek: (Double) -> Void
 
     var body: some View {
@@ -20,9 +22,21 @@ struct TimelineView: View {
 
                 ForEach(segments) { segment in
                     Rectangle()
-                        .fill(Color.gray)
+                        .fill(segment.id == selectedSegmentID ? Color.gray.opacity(0.9) : Color.gray.opacity(0.6))
+                        .overlay(
+                            segment.id == selectedSegmentID
+                                ? RoundedRectangle(cornerRadius: 0).strokeBorder(Color.primary, lineWidth: 1)
+                                : nil
+                        )
                         .frame(width: width(for: segment, totalWidth: geometry.size.width))
                         .offset(x: xPosition(for: segment.startTime, totalWidth: geometry.size.width))
+                }
+
+                if let pendingInPoint {
+                    Rectangle()
+                        .fill(Color.green)
+                        .frame(width: 2)
+                        .offset(x: xPosition(for: pendingInPoint, totalWidth: geometry.size.width))
                 }
 
                 Rectangle()

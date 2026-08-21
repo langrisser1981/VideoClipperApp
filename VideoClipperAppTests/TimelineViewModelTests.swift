@@ -102,4 +102,29 @@ struct TimelineViewModelTests {
         timeline.markOut(at: 10)
         #expect(timeline.segment(containing: 12) == nil)
     }
+
+    @Test func markOut_returnsIdOfCreatedSegment() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        let id = timeline.markOut(at: 10)
+        #expect(id == timeline.segments[0].id)
+    }
+
+    @Test func markOut_returnsIdOfMergedSegmentAfterOverlap() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 0)
+        timeline.markOut(at: 5)
+        timeline.markIn(at: 3)
+        let secondId = timeline.markOut(at: 8)
+        #expect(timeline.segments.count == 1)
+        #expect(secondId == timeline.segments[0].id)
+    }
+
+    @Test func cancelPendingInPoint_clearsPendingWithoutCreatingSegment() {
+        let timeline = TimelineViewModel()
+        timeline.markIn(at: 5)
+        timeline.cancelPendingInPoint()
+        #expect(timeline.pendingInPoint == nil)
+        #expect(timeline.segments.isEmpty)
+    }
 }

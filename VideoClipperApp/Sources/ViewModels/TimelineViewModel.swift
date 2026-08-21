@@ -18,11 +18,19 @@ final class TimelineViewModel {
         pendingInPoint = time
     }
 
-    func markOut(at time: Double) {
-        guard let inPoint = pendingInPoint else { return }
+    @discardableResult
+    func markOut(at time: Double) -> UUID? {
+        guard let inPoint = pendingInPoint else { return nil }
         pendingInPoint = nil
         pushUndoSnapshot()
-        addMerging(ClipSegment(startTime: inPoint, endTime: time))
+        let newSegment = ClipSegment(startTime: inPoint, endTime: time)
+        addMerging(newSegment)
+        return newSegment.id
+    }
+
+    /// Discards a pending in-point (marked with `markIn` but not yet completed with `markOut`).
+    func cancelPendingInPoint() {
+        pendingInPoint = nil
     }
 
     func deleteSegment(id: UUID) {
